@@ -3,10 +3,10 @@
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 name: CI
-on:
+'on':
   # See: https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#pull_request.
-  pull_request:
-  # See: https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#push.
+  pull_request: null # See: https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#push.
+
   push:
     branches:
       - '**'
@@ -19,20 +19,22 @@ concurrency:
 
 env:
   DANGER_RUN_CI_ON_HOST: 1
-  CI_FAILFAST_TEST_LEAVE_DANGLING: 1  # GHA does not care about dangling processes and setting this variable avoids killing the CI script itself on error
+  CI_FAILFAST_TEST_LEAVE_DANGLING: 1 # GHA does not care about dangling processes and setting this variable avoids killing the CI script itself on error
   MAKEJOBS: '-j10'
 
 jobs:
   test-each-commit:
-    name: 'test each commit'
+    name: test each commit
     runs-on: ubuntu-24.04
-    if: github.event_name == 'pull_request' && github.event.pull_request.commits != 1
-    timeout-minutes: 360  # Use maximum time, see https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#jobsjob_idtimeout-minutes. Assuming a worst case time of 1 hour per commit, this leads to a --max-count=6 below.
+    if: github.event_name == 'pull_request' && github.event.pull_request.commits !=
+      1
+    timeout-minutes: 360 # Use maximum time, see https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#jobsjob_idtimeout-minutes. Assuming a worst case time of 1 hour per commit, this leads to a --max-count=6 below.
     env:
       MAX_COUNT: 6
     steps:
       - name: Determine fetch depth
-        run: echo "FETCH_DEPTH=$((${{ github.event.pull_request.commits }} + 2))" >> "$GITHUB_ENV"
+        run: echo "FETCH_DEPTH=$((${{ github.event.pull_request.commits }} + 2))" >>
+          "$GITHUB_ENV"
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha }}
@@ -70,18 +72,19 @@ jobs:
           git rebase --exec "echo Running test-one-commit on \$( git log -1 ) && ./autogen.sh && CC=clang CXX=clang++ ./configure && make clean && make -j $(nproc) check && ./test/functional/test_runner.py -j $(( $(nproc) * 2 ))" ${{ env.TEST_BASE }}
 
   macos-native-x86_64:
-    name: 'macOS 13 native, x86_64, no depends, sqlite only, gui'
+    name: macOS 13 native, x86_64, no depends, sqlite only, gui
     # Use latest image, but hardcode version to avoid silent upgrades (and breaks).
     # See: https://github.com/actions/runner-images#available-images.
     runs-on: macos-13
 
     # No need to run on the read-only mirror, unless it is a PR.
-    if: github.repository != 'bitcoin-core/gui' || github.event_name == 'pull_request'
+    if: github.repository != 'bitcoin-core/gui' || github.event_name ==
+      'pull_request'
 
     timeout-minutes: 120
 
     env:
-      FILE_ENV: './ci/test/00_setup_env_mac_native.sh'
+      FILE_ENV: ./ci/test/00_setup_env_mac_native.sh
       BASE_ROOT_DIR: ${{ github.workspace }}
 
     steps:
@@ -117,27 +120,48 @@ jobs:
 
       - name: Save Ccache cache
         uses: actions/cache/save@v4
-        if: github.event_name != 'pull_request' && steps.ccache-cache.outputs.cache-hit != 'true'
+        if: github.event_name != 'pull_request' && steps.ccache-cache.outputs.cache-hit
+          != 'true'
         with:
           path: ${{ env.CCACHE_DIR }}
           # https://github.com/actions/cache/blob/main/tips-and-workarounds.md#update-a-cache
           key: ${{ github.job }}-ccache-${{ github.run_id }}
 
   win64-native:
-    name: 'Win64 native, VS 2022'
+    name: Win64 native, VS 2022
     # Use latest image, but hardcode version to avoid silent upgrades (and breaks).
     # See: https://github.com/actions/runner-images#available-images.
     runs-on: windows-2022
 
     # No need to run on the read-only mirror, unless it is a PR.
-    if: github.repository != 'bitcoin-core/gui' || github.event_name == 'pull_request'
+    if: github.repository != 'bitcoin-core/gui' || github.event_name ==
+      'pull_request'
 
     env:
-      CCACHE_MAXSIZE: '200M'
-      CI_CCACHE_VERSION: '4.7.5'
-      CI_QT_CONF: '-release -silent -opensource -confirm-license -opengl desktop -static -static-runtime -mp -qt-zlib -qt-pcre -qt-libpng -nomake examples -nomake tests -nomake tools -no-angle -no-dbus -no-gif -no-gtk -no-ico -no-icu -no-libjpeg -no-libudev -no-sql-sqlite -no-sql-odbc -no-sqlite -no-vulkan -skip qt3d -skip qtactiveqt -skip qtandroidextras -skip qtcharts -skip qtconnectivity -skip qtdatavis3d -skip qtdeclarative -skip doc -skip qtdoc -skip qtgamepad -skip qtgraphicaleffects -skip qtimageformats -skip qtlocation -skip qtlottie -skip qtmacextras -skip qtmultimedia -skip qtnetworkauth -skip qtpurchasing -skip qtquick3d -skip qtquickcontrols -skip qtquickcontrols2 -skip qtquicktimeline -skip qtremoteobjects -skip qtscript -skip qtscxml -skip qtsensors -skip qtserialbus -skip qtserialport -skip qtspeech -skip qtsvg -skip qtvirtualkeyboard -skip qtwayland -skip qtwebchannel -skip qtwebengine -skip qtwebglplugin -skip qtwebsockets -skip qtwebview -skip qtx11extras -skip qtxmlpatterns -no-openssl -no-feature-bearermanagement -no-feature-printdialog -no-feature-printer -no-feature-printpreviewdialog -no-feature-printpreviewwidget -no-feature-sql -no-feature-sqlmodel -no-feature-textbrowser -no-feature-textmarkdownwriter -no-feature-textodfwriter -no-feature-xml'
-      CI_QT_DIR: 'qt-everywhere-src-5.15.11'
-      CI_QT_URL: 'https://download.qt.io/official_releases/qt/5.15/5.15.11/single/qt-everywhere-opensource-src-5.15.11.zip'
+      CCACHE_MAXSIZE: 200M
+      CI_CCACHE_VERSION: 4.7.5
+      CI_QT_CONF: '-release -silent -opensource -confirm-license -opengl desktop
+        -static -static-runtime -mp -qt-zlib -qt-pcre -qt-libpng -nomake
+        examples -nomake tests -nomake tools -no-angle -no-dbus -no-gif -no-gtk
+        -no-ico -no-icu -no-libjpeg -no-libudev -no-sql-sqlite -no-sql-odbc
+        -no-sqlite -no-vulkan -skip qt3d -skip qtactiveqt -skip qtandroidextras
+        -skip qtcharts -skip qtconnectivity -skip qtdatavis3d -skip
+        qtdeclarative -skip doc -skip qtdoc -skip qtgamepad -skip
+        qtgraphicaleffects -skip qtimageformats -skip qtlocation -skip qtlottie
+        -skip qtmacextras -skip qtmultimedia -skip qtnetworkauth -skip
+        qtpurchasing -skip qtquick3d -skip qtquickcontrols -skip
+        qtquickcontrols2 -skip qtquicktimeline -skip qtremoteobjects -skip
+        qtscript -skip qtscxml -skip qtsensors -skip qtserialbus -skip
+        qtserialport -skip qtspeech -skip qtsvg -skip qtvirtualkeyboard -skip
+        qtwayland -skip qtwebchannel -skip qtwebengine -skip qtwebglplugin -skip
+        qtwebsockets -skip qtwebview -skip qtx11extras -skip qtxmlpatterns
+        -no-openssl -no-feature-bearermanagement -no-feature-printdialog
+        -no-feature-printer -no-feature-printpreviewdialog
+        -no-feature-printpreviewwidget -no-feature-sql -no-feature-sqlmodel
+        -no-feature-textbrowser -no-feature-textmarkdownwriter
+        -no-feature-textodfwriter -no-feature-xml'
+      CI_QT_DIR: qt-everywhere-src-5.15.11
+      CI_QT_URL: https://download.qt.io/official_releases/qt/5.15/5.15.11/single/qt-everywhere-opensource-src-5.15.11.zip
       PYTHONUTF8: 1
       TEST_RUNNER_TIMEOUT_FACTOR: 40
 
@@ -167,7 +191,8 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: C:\Qt_static
-          key: ${{ github.job }}-static-qt-${{ hashFiles('msbuild_version', 'qt_url', 'qt_conf') }}
+          key: ${{ github.job }}-static-qt-${{ hashFiles('msbuild_version', 'qt_url',
+            'qt_conf') }}
 
       - name: Build static Qt. Download
         if: steps.static-qt-cache.outputs.cache-hit != 'true'
@@ -210,7 +235,8 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: C:\Qt_static
-          key: ${{ github.job }}-static-qt-${{ hashFiles('msbuild_version', 'qt_url', 'qt_conf') }}
+          key: ${{ github.job }}-static-qt-${{ hashFiles('msbuild_version', 'qt_url',
+            'qt_conf') }}
 
       - name: Ccache installation cache
         id: ccache-installation-cache
@@ -256,7 +282,8 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/AppData/Local/vcpkg/archives
-          key: ${{ github.job }}-vcpkg-binary-${{ hashFiles('vcpkg_commit', 'msbuild_version', 'toolset_version', 'build_msvc/vcpkg.json') }}
+          key: ${{ github.job }}-vcpkg-binary-${{ hashFiles('vcpkg_commit',
+            'msbuild_version', 'toolset_version', 'build_msvc/vcpkg.json') }}
 
       - name: Generate project files
         run: py -3 build_msvc\msvc-autogen.py
@@ -272,7 +299,8 @@ jobs:
 
       - name: Save Ccache cache
         uses: actions/cache/save@v4
-        if: github.event_name != 'pull_request' && steps.ccache-cache.outputs.cache-hit != 'true'
+        if: github.event_name != 'pull_request' && steps.ccache-cache.outputs.cache-hit
+          != 'true'
         with:
           path: ~/AppData/Local/ccache
           # https://github.com/actions/cache/blob/main/tips-and-workarounds.md#update-a-cache
@@ -294,7 +322,9 @@ jobs:
         env:
           TEST_RUNNER_EXTRA: ${{ github.event_name != 'pull_request' && '--extended' || '' }}
         shell: cmd
-        run: py -3 test\functional\test_runner.py --jobs %NUMBER_OF_PROCESSORS% --ci --quiet --tmpdirprefix=%RUNNER_TEMP% --combinedlogslen=99999999 --timeout-factor=%TEST_RUNNER_TIMEOUT_FACTOR% %TEST_RUNNER_EXTRA%
+        run: py -3 test\functional\test_runner.py --jobs %NUMBER_OF_PROCESSORS% --ci
+          --quiet --tmpdirprefix=%RUNNER_TEMP% --combinedlogslen=99999999
+          --timeout-factor=%TEST_RUNNER_TIMEOUT_FACTOR% %TEST_RUNNER_EXTRA%
 
       - name: Clone fuzz corpus
         run: |
@@ -305,6 +335,7 @@ jobs:
 
       - name: Run fuzz binaries
         env:
-          BITCOINFUZZ: "${{ github.workspace}}\\src\\fuzz.exe"
+          BITCOINFUZZ: ${{ github.workspace}}\src\fuzz.exe
         shell: cmd
-        run: py -3 test\fuzz\test_runner.py --par %NUMBER_OF_PROCESSORS% --loglevel DEBUG %RUNNER_TEMP%\qa-assets\fuzz_seed_corpus
+        run: py -3 test\fuzz\test_runner.py --par %NUMBER_OF_PROCESSORS% --loglevel
+          DEBUG %RUNNER_TEMP%\qa-assets\fuzz_seed_corpus
